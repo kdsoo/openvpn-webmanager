@@ -4,7 +4,7 @@ $(document).ready(function () {
 	fetchNetworkTable();
 	setInterval(function(){
 		fetchNetworkTable();
-	},10 * 1000);
+	},60 * 1000);
 });
 
 function fetchNetworkTable() {
