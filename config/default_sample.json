@@ -1,4 +1,7 @@
 {
+	"service": {
+		"port": 3005	// or leave it blank and export as shell variable "export PORT=3005"
+	},
 	"networks": [
 	{"name": "10.8.0.1", "server": {"addr": "10.8.0.1", "port": 9000}},
 	{"name":" 10.8.1.1", "server": {"addr": "10.8.0.1", "port": 9001}}
