@@ -1,0 +1,13 @@
+node_modules/
+/config.json
+config.js
+.DS_Store
+.project
+.settings/
+*.sw*
+Session.vim
+default.json
+.vscode/
+.env
+cert/
+vapid/
