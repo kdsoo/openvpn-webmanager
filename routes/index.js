@@ -14,7 +14,6 @@ router.get('/status', function(req, res, next) {
 
 router.get('/rtt/:target', function(req, res, next) {
 	var target = req.params.target;
-	console.log("Query ping of " + target);
 	emitServiceEvent("ping", {cmd: "ping", target: target}, true, function(ret) {
 		res.json(ret.res);
 	});

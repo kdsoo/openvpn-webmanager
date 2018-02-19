@@ -2,7 +2,6 @@ var ping = require('ping');
 
 
 function pingHost(host, cb) {
-	console.log("pingHost " + host);
 	ping.promise.probe(host, { timeout: 3, extra: ['-i', '2'], })
 		.then(function (res) {
 			cb(res);
