@@ -3,7 +3,11 @@ var readline = require('readline');
 var net = require('net');
 var networks = config.get("networks");
 
+var netTableTimer = null;
+var rttTimer = null;
 var clients = {};
+var cachedClients = {};
+var cachedRTT = {};
 
 function connectManager(network, ip, port) {
 	var endpoint = network;
@@ -32,6 +36,9 @@ function connectManager(network, ip, port) {
 				for (var i = 0; i < status.length; i++) {
 					if (isNoti(status[i]))  {
 						// refetch vpn table
+						console.log("####################################################");
+						console.log("Got vpn event");
+						console.log("####################################################");
 						vpnclient.write("status 2\n");
 					} else if (isList(status[i])) {
 						clients[endpoint].networkTable.push(parseList(status[i]));
@@ -40,6 +47,14 @@ function connectManager(network, ip, port) {
 
 				// data chunk aggregation done. flush buffer
 				clients[endpoint].status = null;
+				vpnclient.end();
+
+				// check RTT
+				for (var i = 0; i < clients[endpoint].networkTable.length; i++) {
+					var host = clients[endpoint].networkTable[i];
+					var target = host.vpnaddr;
+					host.rtt = fetchCachedRTT(endpoint, target);
+				}
 			}
 		}
 	});
@@ -48,11 +63,51 @@ function connectManager(network, ip, port) {
 		console.log("connected to " + endpoint);
 		vpnclient.write("status 2\n");
 	});
-				clients[endpoint].status = null;
+	clients[endpoint].status = null;
 
 	vpnclient.on("end",function() {
 		console.log("disconnected from " + endpoint);
 	});
+}
+
+function fetchRTT() {
+	for (var n = 0; n < networks.length; n++) {
+		(function(n) {
+			var endpoint = networks[n].name;
+			// check RTT
+			for (var i = 0; i < clients[endpoint].networkTable.length; i++) {
+				(function (i) {
+					var host = clients[endpoint].networkTable[i];
+					var target = host.vpnaddr;
+					if (!cachedRTT[endpoint]) cachedRTT[endpoint] = {};
+					emitServiceEvent("ping", {cmd: "ping", target: target}, true, function(ret) {
+						cachedRTT[endpoint][target] = ret.res.time;
+						console.log(host.vpnaddr + " rtt: " + ret.res.time);
+					});
+				}(i));
+			}
+		}(n));
+	}
+}
+
+function fetchCachedRTT(endpoint, vpnaddr) {
+	var ret = "unknown";
+	if (!cachedRTT[endpoint]) {
+		console.log("fetchCachedRTT: ", endpoint, vpnaddr, ret);
+		return ret;
+	}
+	if (cachedRTT[endpoint][vpnaddr]) ret = cachedRTT[endpoint][vpnaddr];
+	console.log("fetchCachedRTT: ", endpoint, vpnaddr, ret);
+	return ret;
+}
+
+function addRTT(network, vpnaddr, rtt) {
+	for (var i = 0; i < clients[endpoint].networkTable.length; i++) {
+		if (vpnaddr == clients[endpoint].networkTable[i].vpnaddr) {
+			clients[endpoint].networkTable[i].rtt = rtt;
+			return;
+		}
+	}
 }
 
 function isNoti(msg) {
@@ -94,19 +149,42 @@ function parseList(msg) {
 
 for (var i = 0; i < networks.length; i++) {
 	connectManager(networks[i].name, networks[i].server.addr, networks[i].server.port);
+	cachedClients = clients;
 }
+setTimeout(function() {
+	fetchRTT();
+}, 3000);
+
+function startFetchNet(interval_sec) {
+	netTableTimer = setInterval(function() {
+		for (var i = 0; i < networks.length; i++) {
+			connectManager(networks[i].name, networks[i].server.addr, networks[i].server.port);
+		}
+		cachedClients = clients;
+	}, interval_sec * 1000);
+}
+
+startFetchNet(10);
+
+function startFetchRTT(interval_sec) {
+	rttTimer = setInterval(function() {
+		fetchRTT();
+	}, interval_sec * 1000);
+}
+
+startFetchRTT(60);
 
 serviceEvent.on("vpn", function(msg) {
 	try {
 		if (typeof(msg) == "string")
-			msg = JSON.parse(msg);
+	msg = JSON.parse(msg);
 	} catch(e) {
 		console.error(e);
 	}
 	if (!msg.res && msg.cmd) {
 		switch (msg.cmd) {
 			case "gethosts":
-				msg.res = clients;
+				msg.res = cachedClients;
 				serviceEvent.emit("vpn-" + msg.requestID, msg);
 				break;
 			default:

@@ -16,15 +16,14 @@ socket.on("connect", function() {
 	console.log("websocket connected to " + server + ": " + namespace + "socket");
 });
 
-// {"exchange":"upbit","coin":"QTUM","price":89200,"interval":30}
 socket.on("hosts", function(data) {
 	if (data) {
-		// console.log(data);
+		if (networks.indexOf(data.network) < 0) networks.push(data.network);
 		showHosts(data);
 		var hosts = data.hosts;
+		console.log(hosts);
 		for (var i = 0; i < hosts.length; i++) {
 			addHost(data.network, hosts[i]);
-			fetchRTT(data.network, hosts[i]);
 		}
 	}
 });
